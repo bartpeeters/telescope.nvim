@@ -16,6 +16,7 @@ local conf = require("telescope.config").values
 local filter = vim.tbl_filter
 
 local internal = {}
+local last_used = {}
 
 -- TODO: What the heck should we do for accepting this.
 --  vim.fn.setreg("+", "nnoremap $TODO :lua require('telescope.builtin').<whatever>()<CR>")
@@ -720,7 +721,21 @@ internal.buffers = function(opts)
     return
   end
   if opts.sort_mru then
+    local index={}
+    for k,v in pairs(last_used) do
+       index[v]=k
+    end
     table.sort(bufnrs, function(a, b)
+      a_index = index[a]
+      b_index = index[b]
+      if a_index == nil and b_index ~= nil then
+        return false
+      elseif a_index ~= nil and b_index == nil then
+        return true
+      elseif a_index ~= nil and b_index ~= nil then
+        return a_index > b_index
+      end
+
       return vim.fn.getbufinfo(a)[1].lastused > vim.fn.getbufinfo(b)[1].lastused
     end)
   end
@@ -765,6 +780,14 @@ internal.buffers = function(opts)
     attach_mappings = function(_, _)
       action_set.select:enhance {
         post = function()
+          local current_buf = vim.api.nvim_get_current_buf()
+          for k,v in pairs(last_used) do
+            if v == current_buf then
+               table.remove(last_used, k)
+               break
+            end
+          end
+          table.insert(last_used, current_buf)
           local selection = action_state.get_selected_entry()
           vim.api.nvim_win_set_cursor(0, { selection.lnum, selection.col or 0 })
         end,
